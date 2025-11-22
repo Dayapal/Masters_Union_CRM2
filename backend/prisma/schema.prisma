@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//
+// ENUMS
+//
+enum UserRole {
+  admin
+  manager
+  sales
+}
+
+enum LeadStatus {
+  new
+  contacted
+  qualified
+  proposal
+  won
+  lost
+}
+
+enum ActivityType {
+  note
+  call
+  meeting
+  email
+  status_change
+}
+
+//
+// USER
+//
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      UserRole @default(sales)
+  createdAt DateTime @default(now())
+
+  leads         Lead[]         @relation("LeadOwner")
+  notes         Note[]
+  tasks         Task[]         @relation("TaskAssignee")
+  activities    Activity[]     @relation("ActivityAuthor")
+  notifications Notification[]
+  leadHistory   LeadHistory[] // 🔥 FIXED
+}
+
+//
+// LEAD
+//
+model Lead {
+  id        Int        @id @default(autoincrement())
+  title     String
+  name      String
+  email     String?
+  phone     String?
+  source    String?
+  status    LeadStatus @default(new)
+  value     Float?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Owner
+  ownerId Int?
+  owner   User? @relation("LeadOwner", fields: [ownerId], references: [id])
+
+  // Relations
+  notes      Note[]
+  tasks      Task[]
+  activities Activity[]
+  history    LeadHistory[]
+  emails     Email[]
+  deals      Deal[] // 🔥 FIXED
+}
+
+//
+// CONTACT
+//
+model Contact {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  phone     String?
+  company   String?
+  createdAt DateTime @default(now())
+}
+
+//
+// DEAL
+//
+model Deal {
+  id        Int      @id @default(autoincrement())
+  title     String
+  amount    Float
+  status    String   @default("open") // open | won | lost
+  leadId    Int?
+  lead      Lead?    @relation(fields: [leadId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+//
+// NOTE
+//
+model Note {
+  id      Int    @id @default(autoincrement())
+  content String
+  leadId  Int
+  lead    Lead   @relation(fields: [leadId], references: [id])
+
+  authorId Int?
+  author   User? @relation(fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+//
+// TASKS
+//
+model Task {
+  id        Int       @id @default(autoincrement())
+  title     String
+  dueDate   DateTime?
+  completed Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  leadId Int?
+  lead   Lead? @relation(fields: [leadId], references: [id])
+
+  assigneeId Int?
+  assignee   User? @relation("TaskAssignee", fields: [assigneeId], references: [id])
+}
+
+//
+// ACTIVITY TIMELINE
+//
+model Activity {
+  id        Int          @id @default(autoincrement())
+  type      ActivityType
+  note      String?
+  subject   String?
+  metadata  Json?
+  createdAt DateTime     @default(now())
+
+  leadId Int
+  lead   Lead @relation(fields: [leadId], references: [id])
+
+  authorId Int?
+  author   User? @relation("ActivityAuthor", fields: [authorId], references: [id])
+}
+
+//
+// LEAD HISTORY (Audit Trail)
+//
+model LeadHistory {
+  id     Int  @id @default(autoincrement())
+  leadId Int
+  lead   Lead @relation(fields: [leadId], references: [id])
+
+  changedById Int?
+  changedBy   User? @relation(fields: [changedById], references: [id])
+
+  oldValue  Json?
+  newValue  Json?
+  action    String
+  createdAt DateTime @default(now())
+}
+
+//
+// EMAIL LOGS
+//
+model Email {
+  id        Int       @id @default(autoincrement())
+  direction String
+  subject   String?
+  body      String?
+  to        String?
+  from      String?
+  metadata  Json?
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  leadId Int?
+  lead   Lead? @relation(fields: [leadId], references: [id])
+}
+
+//
+// NOTIFICATIONS
+//
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  type      String
+  message   String
+  payload   Json?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

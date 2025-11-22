@@ -1,0 +1,9 @@
+node_modules
+# Keep environment variables out of version control
+.env
+
+/generated/prisma
+{
+  "ext": "js,ts,json",
+  "ignore": ["node_modules", "public"]
+}
